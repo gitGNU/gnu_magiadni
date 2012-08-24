@@ -1,5 +1,5 @@
 //  MagiaDNI - Calcular dígito de control de los datos OCR del DNI
-//  Copyright © 2011  Josep Portella Florit <hola@josep-portella.com>
+//  Copyright © 2011-2012  Josep Portella Florit <hola@josep-portella.com>
 //
 //  This program is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -39,6 +39,8 @@ import android.view.View;
 import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
 import android.view.WindowManager;
+
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.locks.ReentrantLock;
@@ -170,7 +172,10 @@ class Preview extends SurfaceView implements SurfaceHolder.Callback,
         datosOCR.setTamañoImagen(size.width, size.height);
         errores = LÍMITE_ERRORES;
         enfocando = false;
-        camera.setPreviewDisplay(holder);
+        try {
+            camera.setPreviewDisplay(holder);
+        } catch (IOException e) {
+        }
     }
 
     public void onPreviewFrame(byte[] data, Camera _) {
@@ -227,11 +232,9 @@ class Pantalla extends View {
         guía = new Paint();
         guía.setARGB(200, 255, 255, 255);
         texto = new Paint();
-        texto.setTextSize(14);
         texto.setColor(Color.WHITE);
         texto.setAntiAlias(true);
         estiloDígito = new Paint();
-        estiloDígito.setTextSize(164);
         estiloDígito.setTextAlign(Paint.Align.CENTER);
         estiloDígito.setAntiAlias(true);
         estiloDígito.setColor(Color.WHITE);
@@ -267,6 +270,7 @@ class Pantalla extends View {
                         }
                 }
         }
+        texto.setTextSize(canvas.getHeight() / 22);
         String mensaje = "Enfocar parte posterior del DNI";
         float x = 5;
         if (depuración) {
@@ -311,6 +315,7 @@ class Pantalla extends View {
         }
         if (dígito != '?' && confirmación >= CONFIRMACIÓN_ACEPTABLE
             && cuentaAtrás > 0) {
+            estiloDígito.setTextSize(canvas.getHeight() / 2);
             y = canvas.getHeight() / 2 + estiloDígito.getTextSize() / 3;
             canvas.drawText(Character.toString(dígito), x, y, estiloDígito);
             if (--cuentaAtrás == 0)
@@ -345,17 +350,42 @@ class DatosOCR {
     private static final int FILA_NÚMEROS = 0;
     private static final int COLUMNA_NÚMEROS = 5;
     private static final int TAMAÑO_NÚMERO_SOPORTE = 9;
-    private static final int CANTIDAD_LETRAS_NÚMERO_SOPORTE = 3;
     private static final int TAMAÑO_NÚMERO_DNI = 8;
     private static final int TAMAÑO_NIF = TAMAÑO_NÚMERO_DNI + 1;
+
+    private static final int COLUMNA_NIF_DNI = COLUMNA_NÚMEROS;
+    private static final int COLUMNA_LETRA_DNI =
+        COLUMNA_NÚMEROS + TAMAÑO_NÚMERO_DNI;
+    private static final int COLUMNA_DÍGITO_CONTROL_NIF =
+        COLUMNA_NÚMEROS + TAMAÑO_NIF;
+    private static final int COLUMNA_FINAL_LETRAS_NÚMERO_SOPORTE_DNIE =
+        COLUMNA_NÚMEROS + 3;
+    private static final int COLUMNA_NIF_DNIE =
+        COLUMNA_NÚMEROS + TAMAÑO_NÚMERO_SOPORTE + 1;
+    private static final int COLUMNA_LETRA_DNIE =
+        COLUMNA_NIF_DNIE + TAMAÑO_NÚMERO_DNI;
     private static final int COLUMNA_ÚLTIMO_DÍGITO_DNIE =
-        COLUMNA_NÚMEROS + TAMAÑO_NÚMERO_SOPORTE + 1 + TAMAÑO_NÚMERO_DNI - 1;
+        COLUMNA_NIF_DNIE + TAMAÑO_NÚMERO_DNI - 1;
+    private static final int COLUMNA_FINAL_NIF_DNIE =
+        COLUMNA_NIF_DNIE + TAMAÑO_NIF;
+    private static final int COLUMNA_FINAL_LETRAS_NÚMERO_SOPORTE_NIE =
+        COLUMNA_NÚMEROS + 1;
+    private static final int COLUMNA_SEPARADOR_NIE =
+        COLUMNA_NÚMEROS + TAMAÑO_NÚMERO_SOPORTE + 1; 
+    private static final int COLUMNA_NIE = COLUMNA_SEPARADOR_NIE + 1;
+    private static final int COLUMNA_LETRA_NIE =
+        COLUMNA_NIE + TAMAÑO_NÚMERO_DNI;
+    private static final int COLUMNA_FINAL_NIE = COLUMNA_NIE + TAMAÑO_NIF;
 
     private static final int FILA_FECHAS = 1;
     private static final int COLUMNA_FECHA_NACIMIENTO = 0;
     private static final int TAMAÑO_FECHA = 6;
     private static final int COLUMNA_FECHA_CADUCIDAD =
         COLUMNA_FECHA_NACIMIENTO + TAMAÑO_FECHA + 1 + 1;
+    private static final int COLUMNA_DÍGITO_CONTROL_FECHA_NACIMIENTO =
+        COLUMNA_FECHA_NACIMIENTO + TAMAÑO_FECHA;
+    private static final int COLUMNA_DÍGITO_CONTROL_FECHA_CADUCIDAD =
+        COLUMNA_FECHA_CADUCIDAD + TAMAÑO_FECHA;
     private static final int TAMAÑO_DATOS_DNI =
         TAMAÑO_NIF + 1 + TAMAÑO_FECHA + 1 + TAMAÑO_FECHA + 1;
     private static final int TAMAÑO_DATOS_DNIE =
@@ -364,15 +394,19 @@ class DatosOCR {
 
     private static final int NÚMERO_FILAS = FILA_FECHAS + 1;
     private static final int NÚMERO_COLUMNAS =
-        COLUMNA_NÚMEROS + TAMAÑO_NÚMERO_SOPORTE + 1 + TAMAÑO_NIF;
+        COLUMNA_SEPARADOR_NIE + TAMAÑO_NIF + 1;
 
     private static final String DÍGITOS = "0123456789";
     private static final String DÍGITOS_O_NULO = "0123456789<";
-    private static final String DÍGITOS_O_LETRAS_NIE = "0123456789XYZ";
+    private static final String LETRAS_INICIO_NIE = "XYZ";
     private static final String LETRAS_NIF = "TRWAGMYFPDXBNJZSQVHLCKE";
     private static final String LETRAS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
     private static final int[] PESOS = { 7, 3, 1 };
+
+    private static final int FORMATO_DNI = 1;
+    private static final int FORMATO_DNIE = 2;
+    private static final int FORMATO_NIE = 3;
 
     private int anchoImagen;
     private int altoImagen;
@@ -403,7 +437,7 @@ class DatosOCR {
 
     private HashMap<Character, boolean[][]> plantillas;
 
-    private boolean esDNIE;
+    private int formato;
     private char[] númeroSoporte;
     private char dígitoControlCódigoSoporte;
     private char[] númeroDNI;
@@ -755,7 +789,7 @@ class DatosOCR {
     }
 
     private boolean bitCarácter(int columna, int fila, int x, int y,
-                                   int umbral) {
+                                int umbral) {
         return luminosidadCarácter(columna, fila, x, y) < umbral;
     }
 
@@ -836,17 +870,21 @@ class DatosOCR {
 
     private String caracteresPosibles(int columna, int fila) {
         if (fila == 0) {
-            if (esDNIE) {
+            if (formato == FORMATO_DNIE) {
                 if (columna >= COLUMNA_NÚMEROS
-                    && columna < COLUMNA_NÚMEROS
-                                 + CANTIDAD_LETRAS_NÚMERO_SOPORTE)
+                    && columna < COLUMNA_FINAL_LETRAS_NÚMERO_SOPORTE_DNIE)
                     return LETRAS;
-                if (columna == COLUMNA_NÚMEROS + TAMAÑO_NÚMERO_SOPORTE
-                               + 1 + TAMAÑO_NÚMERO_DNI)
+                if (columna == COLUMNA_LETRA_DNIE)
                     return LETRAS_NIF;
-            } else if (columna == COLUMNA_NÚMEROS)
-                return DÍGITOS_O_LETRAS_NIE;
-            else if (columna == COLUMNA_NÚMEROS + TAMAÑO_NÚMERO_DNI)
+            } else if (formato == FORMATO_NIE) {
+                if (columna >= COLUMNA_NÚMEROS
+                    && columna < COLUMNA_FINAL_LETRAS_NÚMERO_SOPORTE_NIE)
+                    return LETRAS;
+                if (columna == COLUMNA_NIE)
+                    return LETRAS_INICIO_NIE;
+                if (columna == COLUMNA_LETRA_NIE)
+                        return LETRAS_NIF;
+            } else if (columna == COLUMNA_LETRA_DNI)
                 return LETRAS_NIF;
         }
         return DÍGITOS;
@@ -889,15 +927,8 @@ class DatosOCR {
 
     public static char calcularLetraNúmeroDNI(char[] cs) {
         int n = 0;
-        for (char c : cs) {
-            n *= 10;
-            if (c == 'Y')
-                n += 1;
-            else if (c == 'Z')
-                n += 2;
-            else if ((c != 'X'))
-                n += c - '0';
-        }
+        for (char c : cs)
+            n = c - '0' + n * 10;
         return LETRAS_NIF.charAt(n % LETRAS_NIF.length());
     }
 
@@ -912,10 +943,19 @@ class DatosOCR {
     }
 
     private boolean númeroDNIVálido() {
-        int inicio = COLUMNA_NÚMEROS
-                     + (esDNIE ? TAMAÑO_NÚMERO_SOPORTE + 1 : 0);
+        int inicio = formato == FORMATO_DNI
+                         ? COLUMNA_NIF_DNI
+                         : (formato == FORMATO_DNIE
+                                ? COLUMNA_NIF_DNIE
+                                : COLUMNA_NIE);
         for (int i = 0; i < númeroDNI.length; i++)
             númeroDNI[i] = valorCarácter(i + inicio, FILA_NÚMEROS);
+        if (númeroDNI[0] == 'Y')
+            númeroDNI[0] = '1';
+        else if (númeroDNI[0] == 'Z')
+            númeroDNI[0] = '2';
+        else if (númeroDNI[0] == 'X')
+            númeroDNI[0] = '0';
         letraNúmeroDNI = valorCarácter(inicio + númeroDNI.length,
                                        FILA_NÚMEROS);
         return calcularLetraNúmeroDNI(númeroDNI) == letraNúmeroDNI;
@@ -925,7 +965,7 @@ class DatosOCR {
         for (int i = 0; i < númeroDNI.length; i++)
             NIF[i] = númeroDNI[i];
         NIF[NIF.length - 1] = letraNúmeroDNI;
-        dígitoControlNIF = valorCarácter(COLUMNA_NÚMEROS + NIF.length,
+        dígitoControlNIF = valorCarácter(COLUMNA_DÍGITO_CONTROL_NIF,
                                          FILA_NÚMEROS);
         return dígitoControl(NIF) == dígitoControlNIF;
     }
@@ -935,8 +975,7 @@ class DatosOCR {
             fechaNacimiento[i] =
                 valorCarácter(i + COLUMNA_FECHA_NACIMIENTO, FILA_FECHAS);
         dígitoControlFechaNacimiento =
-            valorCarácter(COLUMNA_FECHA_NACIMIENTO
-                          + fechaNacimiento.length,
+            valorCarácter(COLUMNA_DÍGITO_CONTROL_FECHA_NACIMIENTO,
                           FILA_FECHAS);
         return dígitoControl(fechaNacimiento) == dígitoControlFechaNacimiento;
     }
@@ -946,7 +985,7 @@ class DatosOCR {
             fechaCaducidad[i] =
                 valorCarácter(i + COLUMNA_FECHA_CADUCIDAD, FILA_FECHAS);
         dígitoControlFechaCaducidad =
-            valorCarácter(COLUMNA_FECHA_CADUCIDAD + fechaCaducidad.length,
+            valorCarácter(COLUMNA_DÍGITO_CONTROL_FECHA_CADUCIDAD,
                           FILA_FECHAS);
         return dígitoControl(fechaCaducidad) == dígitoControlFechaCaducidad;
     }
@@ -954,13 +993,13 @@ class DatosOCR {
     private boolean datosLeídosCorrectamente() {
         return númeroDNIVálido() && fechaNacimientoVálida()
                && fechaCaducidadVálida()
-               && ((esDNIE && códigoSoporteVálido())
-                   || (!esDNIE && NIFVálido()));
+               && ((formato != FORMATO_DNI && códigoSoporteVálido())
+                   || (formato == FORMATO_DNI && NIFVálido()));
     }
 
     private char calculaDígito() {
         int i = 0;
-        if (esDNIE) {
+        if (formato != FORMATO_DNI) {
             for (char c : númeroSoporte)
                 datosDNIE[i++] = c;
             datosDNIE[i++] = dígitoControlCódigoSoporte;
@@ -989,18 +1028,19 @@ class DatosOCR {
 
     public boolean esCarácterSignificativo(int columna, int fila) {
         return (fila == FILA_NÚMEROS && columna >= COLUMNA_NÚMEROS
-                && ((esDNIE && columna < COLUMNA_NÚMEROS
-                                         + TAMAÑO_NÚMERO_SOPORTE
-                                         + 1 + TAMAÑO_NIF)
-                    || (!esDNIE && columna < COLUMNA_NÚMEROS
-                                             + TAMAÑO_NIF + 1)))
+                && ((formato == FORMATO_NIE
+                     && columna < COLUMNA_FINAL_NIE
+                     && columna != COLUMNA_SEPARADOR_NIE)
+                    || (formato == FORMATO_DNIE
+                        && columna < COLUMNA_FINAL_NIF_DNIE)
+                    || (formato == FORMATO_DNI
+                        && columna <= COLUMNA_DÍGITO_CONTROL_NIF)))
                || (fila == FILA_FECHAS
                    && ((columna >= COLUMNA_FECHA_NACIMIENTO
-                        && columna <= COLUMNA_FECHA_NACIMIENTO
-                                      + TAMAÑO_FECHA)
+                        && columna <= COLUMNA_DÍGITO_CONTROL_FECHA_NACIMIENTO)
                        || (columna >= COLUMNA_FECHA_CADUCIDAD
-                           && columna <= COLUMNA_FECHA_CADUCIDAD
-                                         + TAMAÑO_FECHA)));
+                           && columna
+                              <= COLUMNA_DÍGITO_CONTROL_FECHA_CADUCIDAD)));
     }
 
     public boolean encontrar(byte[] píxeles) {
@@ -1009,9 +1049,14 @@ class DatosOCR {
         dígito = '?';
         if ((filas = encuentraFilas()) != null) {
             if ((columnas = encuentraColumnas()) != null) {
-                esDNIE = valorCarácter(COLUMNA_ÚLTIMO_DÍGITO_DNIE,
-                                       FILA_NÚMEROS, DÍGITOS_O_NULO)
-                         != '<';
+                if ('<' == valorCarácter(COLUMNA_ÚLTIMO_DÍGITO_DNIE,
+                                         FILA_NÚMEROS, DÍGITOS_O_NULO))
+                    formato = FORMATO_DNI;
+                else if ('<' == valorCarácter(COLUMNA_SEPARADOR_NIE,
+                                              FILA_NÚMEROS, DÍGITOS_O_NULO))
+                    formato = FORMATO_NIE;
+                else 
+                    formato = FORMATO_DNIE;
                 if (datosLeídosCorrectamente()) {
                     dígito = calculaDígito();
                     resultadosEncontradoDígito++;
