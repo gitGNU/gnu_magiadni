@@ -1,5 +1,5 @@
 //  MagiaDNI - Calcular dígito de control de los datos OCR del DNI
-//  Copyright © 2011-2012  Josep Portella Florit <hola@josep-portella.com>
+//  Copyright © 2011-2013  Josep Portella Florit <hola@josep-portella.com>
 //
 //  This program is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -368,14 +368,6 @@ class DatosOCR {
         COLUMNA_NIF_DNIE + TAMAÑO_NÚMERO_DNI - 1;
     private static final int COLUMNA_FINAL_NIF_DNIE =
         COLUMNA_NIF_DNIE + TAMAÑO_NIF;
-    private static final int COLUMNA_FINAL_LETRAS_NÚMERO_SOPORTE_NIE =
-        COLUMNA_NÚMEROS + 1;
-    private static final int COLUMNA_SEPARADOR_NIE =
-        COLUMNA_NÚMEROS + TAMAÑO_NÚMERO_SOPORTE + 1; 
-    private static final int COLUMNA_NIE = COLUMNA_SEPARADOR_NIE + 1;
-    private static final int COLUMNA_LETRA_NIE =
-        COLUMNA_NIE + TAMAÑO_NÚMERO_DNI;
-    private static final int COLUMNA_FINAL_NIE = COLUMNA_NIE + TAMAÑO_NIF;
 
     private static final int FILA_FECHAS = 1;
     private static final int COLUMNA_FECHA_NACIMIENTO = 0;
@@ -394,11 +386,10 @@ class DatosOCR {
 
     private static final int NÚMERO_FILAS = FILA_FECHAS + 1;
     private static final int NÚMERO_COLUMNAS =
-        COLUMNA_SEPARADOR_NIE + TAMAÑO_NIF + 1;
+            COLUMNA_NIF_DNIE + TAMAÑO_NIF;
 
     private static final String DÍGITOS = "0123456789";
     private static final String DÍGITOS_O_NULO = "0123456789<";
-    private static final String LETRAS_INICIO_NIE = "XYZ";
     private static final String LETRAS_NIF = "TRWAGMYFPDXBNJZSQVHLCKE";
     private static final String LETRAS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -406,7 +397,6 @@ class DatosOCR {
 
     private static final int FORMATO_DNI = 1;
     private static final int FORMATO_DNIE = 2;
-    private static final int FORMATO_NIE = 3;
 
     private int anchoImagen;
     private int altoImagen;
@@ -876,14 +866,6 @@ class DatosOCR {
                     return LETRAS;
                 if (columna == COLUMNA_LETRA_DNIE)
                     return LETRAS_NIF;
-            } else if (formato == FORMATO_NIE) {
-                if (columna >= COLUMNA_NÚMEROS
-                    && columna < COLUMNA_FINAL_LETRAS_NÚMERO_SOPORTE_NIE)
-                    return LETRAS;
-                if (columna == COLUMNA_NIE)
-                    return LETRAS_INICIO_NIE;
-                if (columna == COLUMNA_LETRA_NIE)
-                        return LETRAS_NIF;
             } else if (columna == COLUMNA_LETRA_DNI)
                 return LETRAS_NIF;
         }
@@ -945,17 +927,9 @@ class DatosOCR {
     private boolean númeroDNIVálido() {
         int inicio = formato == FORMATO_DNI
                          ? COLUMNA_NIF_DNI
-                         : (formato == FORMATO_DNIE
-                                ? COLUMNA_NIF_DNIE
-                                : COLUMNA_NIE);
+                         : COLUMNA_NIF_DNIE;
         for (int i = 0; i < númeroDNI.length; i++)
             númeroDNI[i] = valorCarácter(i + inicio, FILA_NÚMEROS);
-        if (númeroDNI[0] == 'Y')
-            númeroDNI[0] = '1';
-        else if (númeroDNI[0] == 'Z')
-            númeroDNI[0] = '2';
-        else if (númeroDNI[0] == 'X')
-            númeroDNI[0] = '0';
         letraNúmeroDNI = valorCarácter(inicio + númeroDNI.length,
                                        FILA_NÚMEROS);
         return calcularLetraNúmeroDNI(númeroDNI) == letraNúmeroDNI;
@@ -1028,10 +1002,7 @@ class DatosOCR {
 
     public boolean esCarácterSignificativo(int columna, int fila) {
         return (fila == FILA_NÚMEROS && columna >= COLUMNA_NÚMEROS
-                && ((formato == FORMATO_NIE
-                     && columna < COLUMNA_FINAL_NIE
-                     && columna != COLUMNA_SEPARADOR_NIE)
-                    || (formato == FORMATO_DNIE
+                && ((formato == FORMATO_DNIE
                         && columna < COLUMNA_FINAL_NIF_DNIE)
                     || (formato == FORMATO_DNI
                         && columna <= COLUMNA_DÍGITO_CONTROL_NIF)))
@@ -1052,9 +1023,6 @@ class DatosOCR {
                 if ('<' == valorCarácter(COLUMNA_ÚLTIMO_DÍGITO_DNIE,
                                          FILA_NÚMEROS, DÍGITOS_O_NULO))
                     formato = FORMATO_DNI;
-                else if ('<' == valorCarácter(COLUMNA_SEPARADOR_NIE,
-                                              FILA_NÚMEROS, DÍGITOS_O_NULO))
-                    formato = FORMATO_NIE;
                 else 
                     formato = FORMATO_DNIE;
                 if (datosLeídosCorrectamente()) {
