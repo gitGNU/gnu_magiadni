@@ -1,5 +1,5 @@
 //  MagiaDNI - Calcular dígito de control de los datos OCR del DNI
-//  Copyright © 2011-2013  Josep Portella Florit <hola@josep-portella.com>
+//  Copyright © 2011-2016  Josep Portella Florit <hola@josep-portella.com>
 //
 //  This program is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
