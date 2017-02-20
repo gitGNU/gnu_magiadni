@@ -1,7 +1,7 @@
 <!--
 
     MagiaDNI - Calcular dígito de control de los datos OCR del DNI
-    Copyright © 2011-2016  Josep Portella Florit <hola@josep-portella.com>
+    Copyright © 2011-2017  Josep Portella Florit <hola@josep-portella.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -24,10 +24,7 @@
   </head>
   <body>
     <h1>Manual del usuario de MagiaDNI</h1>
-    <p>Copyright © 2011-2016  <a href="mailto:hola@josep-portella.com">Josep Portella Florit</a></p>
-    <h2>Antes de empezar...</h2>
-    <p>¿Sabías que no todos los países tienen tarjeta de identidad obligatoria?</p>
-    <p><a href="http://thefishpond.in/anivar/2010/citizens-against-uid/">Hay gente que se opone a su implantación</a>.
+    <p>Copyright © 2011-2017  <a href="mailto:hola@josep-portella.com">Josep Portella Florit</a></p>
     <h2>Introducción</h2>
     <p>Una vez más, alguien saca el tema; dicen que detrás del DNI, donde hay 3 líneas con diversos datos, aparece el número de personas que se llaman igual que el titular.  Tú intuyes que eso no puede ser, ¿pero cómo vas a demostrar que es un leyenda urbana?  Puede que incluso conozcas el artículo <a href="http://josep-portella.com/escritos/dni/">Desmitificando los números del DNI</a>, en el cual se demuestra que es un mito explicando de dónde sale el dichoso número, ¿pero cómo se lo vas a explicar tú a tus amigos?</p>
     <p>Con este programa vas a poder demostrar la verdad de una forma visual y en el mismo momento en que salga el tema.</p>
@@ -36,7 +33,7 @@
     <h2>Cómo se usa</h2>
     <p>La pantalla principal del programa se utiliza con la pantalla en modo paisaje.</p>
     <img src="captura1.jpg" width="100%" />
-    <p>La cruz que aparece en medio de la pantalla te servirá de guía a la hora de enfocar los datos de la parte posterior del DNI.  Al principio saldrá la imagen borrosa; cuando el programa se dé cuenta de que no encuentra las líneas, intentará enfocar la imagen automáticamente.  Cuando ya tenga una idea de dónde pueden estar las líneas, marcará las dos primeras con unas líneas horizontales de izquierda a derecha de la pantalla.</p>
+    <p>El rectángulo que aparece en medio de la pantalla te servirá de guía a la hora de enfocar los datos de la parte posterior del DNI.  Al principio saldrá la imagen borrosa; cuando el programa se dé cuenta de que no encuentra las líneas, intentará enfocar la imagen automáticamente.  Cuando ya tenga una idea de dónde pueden estar las líneas, marcará las dos primeras con unas líneas horizontales de izquierda a derecha de la pantalla.</p>
     <img src="captura2.jpg" width="100%" />
     <p>En el momento en que el programa logra determinar la posición de los caracteres, marcará con un rectángulo todos los que sean necesarios para el cálculo del dígito de control.</p>
     <img src="captura3.jpg" width="100%" />
@@ -50,15 +47,16 @@
       <li>Puede funcionar con poca luz, pero cuanta más luz mejor.</li>
       <li>Lo ideal es que la luz sea uniforme, sin sombras ni brillos excesivos.</li>
       <li>En el caso de que haya poca luz, suele funcionar mejor cuanto más cerca esté la cámara, pero hay que asegurarse de que se pueden ver al menos 24 carácteres de las 3 filas.</li>
+      <li>Funcionará mucho mejor si el objetivo de la cámara está limpio.</li>
       <li>Suele ir mejor con el DNI encima de una mesa, pero también puede funcionar con el DNI cogido con un mano.</li>
       <li>Cabe la posibilidad de que el programa muestre el dígito que no es si hay 2 o más errores de lectura inoportunos.  En las pruebas que se realizaron, en unas pocas ocasiones se mostró un dígito incorrecto para luego ser sustituído inmediatamente por el correcto.  Este comportamiento se corrigió haciendo que el programa requiera obtener el mismo dígito varias veces antes de mostrarlo.  Después de hacer este cambio no se volvió a observar este problema, pero aún así, teóricamente, es algo que puede ocurrir.</li>
     </ul>
     <h2>Más información</h2>
-    <p>Pulsando el botón "menú" del smartphone estando en la pantalla principal de MagiaDNI aparecen estas opciones:</p>
+    <p>Pulsando el botón "menú" del smartphone o tocando la pantalla estando en la pantalla principal de MagiaDNI aparecen estas opciones:</p>
     <ul>
       <li><b>Manual</b>: muestra este manual.</li>
+      <li><b>Privacidad</b>: muestra la política de privacidad.</li>
       <li><b>Copyleft</b>: muestra información de licencia.</li>
-      <li><b>Depuración</b>: muestra/oculta información de depuración en pantalla que has de comunicar al autor del programa en el caso de que el programa no funcione correctamente.</li>
     </ul>
     <p>Para volver a la pantalla principal se ha de pulsar el botón "atrás" del smartphone.</p>
   </body>

@@ -1,5 +1,5 @@
 //  MagiaDNI - Calcular dígito de control de los datos OCR del DNI
-//  Copyright © 2011-2016  Josep Portella Florit <hola@josep-portella.com>
+//  Copyright © 2011-2017  Josep Portella Florit <hola@josep-portella.com>
 //
 //  This program is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -20,7 +20,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.content.DialogInterface.OnClickListener;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
@@ -33,6 +32,7 @@ import android.os.Bundle;
 import android.view.Display;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -49,8 +49,8 @@ import java.util.List;
 
 public class MagiaDNI extends Activity {
     private MenuItem opciónManual;
+    private MenuItem opciónPrivacidad;
     private MenuItem opciónCopyleft;
-    private MenuItem opciónDepuración;
     private Pantalla pantalla;
     private Preview preview;
 
@@ -68,26 +68,12 @@ public class MagiaDNI extends Activity {
         setContentView(preview);
         addContentView(pantalla, new LayoutParams(LayoutParams.WRAP_CONTENT,
                                                   LayoutParams.WRAP_CONTENT));
-        AlertDialog deleteAlert = new AlertDialog.Builder(this).create();
-        deleteAlert.setTitle("MagiaDNI");
-        deleteAlert.setMessage(
-            "Por favor, lee el manual antes de usar la aplicación.");
-        deleteAlert.setButton("Leer manual", new OnClickListener() {
-            public void onClick(DialogInterface dialog, int which) {
-                mostrarTexto("manual");
-            }
-        });
-        deleteAlert.setButton2("Continuar", new OnClickListener() {
-            public void onClick(DialogInterface dialog, int which) {
-            }
-        });
-        deleteAlert.show();
-        }
+    }
 
     public boolean onCreateOptionsMenu(Menu menu) {
         opciónManual = menu.add("Manual");
+        opciónPrivacidad = menu.add("Privacidad");
         opciónCopyleft = menu.add("Copyleft");
-        opciónDepuración = menu.add("Depuración");
         return super.onCreateOptionsMenu(menu);
     }
 
@@ -102,11 +88,17 @@ public class MagiaDNI extends Activity {
     public boolean onMenuItemSelected(int featureId, MenuItem item) {
         if (item == opciónManual)
             mostrarTexto("manual");
+        if (item == opciónPrivacidad)
+            mostrarTexto("privacidad");
         if (item == opciónCopyleft)
             mostrarTexto("copyleft");
-        if (item == opciónDepuración)
-            pantalla.cambiaDepuración();
         return false;
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        openOptionsMenu();
+        return true;
     }
 }
 
@@ -114,12 +106,15 @@ class Preview extends SurfaceView implements SurfaceHolder.Callback,
                                              Camera.PreviewCallback,
                                              Camera.AutoFocusCallback {
     private static final int LÍMITE_ERRORES = 20;
+    private static final int ANCHO_MÍNIMO = 640;
+    private static final int ALTO_MÍNIMO = 480;
 
     private ReentrantLock lock;
     private Camera camera;
     private DatosOCR datosOCR;
     private Pantalla pantalla;
     private Display display;
+    private boolean avisado = false;
     private boolean enfocando;
     private int errores;
 
@@ -136,6 +131,12 @@ class Preview extends SurfaceView implements SurfaceHolder.Callback,
             Context.WINDOW_SERVICE)).getDefaultDisplay();
     }
 
+    private long diferenciaRatio(Camera.Size size) {
+        return Math.round(10 * Math.abs((double) size.width / size.height
+                                        - (double) display.getWidth()
+                                          / display.getHeight()));
+    }
+
     public void surfaceCreated(SurfaceHolder holder) {
         camera = Camera.open();
         try {
@@ -144,32 +145,49 @@ class Preview extends SurfaceView implements SurfaceHolder.Callback,
                 Camera.Parameters.class.getMethod(
                     "getSupportedPreviewSizes");
             @SuppressWarnings("unchecked")
-            List<Camera.Size> sizes = (List<Camera.Size>)
+            List<Camera.Size> candidatos = (List<Camera.Size>)
                 getSupportedPreviewSizes.invoke(parameters);
-            int displayRatio = (int) (((float) display.getWidth()
-                                       / display.getHeight())
-                                      * 100);
-            Camera.Size max = null;
-            Camera.Size maxÓptimo = null;
-            for (Camera.Size size : sizes) {
-                if (max == null || max.width <= size.width)
-                    max = size;
-                int ratio = (int) (((float) size.width / size.height) * 100);
-                if (ratio == displayRatio
-                    && (maxÓptimo == null || maxÓptimo.width < size.width))
-                    maxÓptimo = size;
+            Camera.Size óptimo = null;
+            for (Camera.Size candidato : candidatos) {
+                if (óptimo == null
+                    || (candidato.height < ALTO_MÍNIMO
+                        && candidato.height >= óptimo.height
+                        && diferenciaRatio(candidato)
+                           <= diferenciaRatio(óptimo))
+                    || diferenciaRatio(candidato) < diferenciaRatio(óptimo)
+                    || (candidato.height < óptimo.height
+                        && diferenciaRatio(candidato)
+                           == diferenciaRatio(óptimo)))
+                    óptimo = candidato;
             }
-            if (maxÓptimo == null)
-                parameters.setPreviewSize(max.width, max.height);
-            else
-                parameters.setPreviewSize(maxÓptimo.width, maxÓptimo.height);
+            parameters.setPreviewSize(óptimo.width, óptimo.height);
             camera.setParameters(parameters);
         } catch (NoSuchMethodException e) {
         } catch (InvocationTargetException e) {
         } catch (IllegalAccessException e) {
         }
         Camera.Size size = camera.getParameters().getPreviewSize();
-        datosOCR.setTamañoImagen(size.width, size.height);
+        if ((size.width < ANCHO_MÍNIMO || size.height < ALTO_MÍNIMO)
+            && !avisado) {
+            avisado = true;
+            AlertDialog deleteAlert = new AlertDialog.Builder(
+                    getContext()).create();
+            deleteAlert.setTitle("MagiaDNI");
+            deleteAlert.setMessage(
+                "La resolución de vista previa de la cámara de este "
+                + "dispositivo es muy baja (" + size.width + "x"
+                + size.height + ") .  Puede que la "
+                + "aplicación no funcione correctamente.");
+            deleteAlert.setButton("Entendido",
+                new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                    }
+                });
+            deleteAlert.show();
+        }
+        datosOCR.setTamañoImagen(
+                size.width, size.height, Math.min(size.width, ANCHO_MÍNIMO),
+                Math.min(size.height, ALTO_MÍNIMO) / 3);
         errores = LÍMITE_ERRORES;
         enfocando = false;
         try {
@@ -178,7 +196,7 @@ class Preview extends SurfaceView implements SurfaceHolder.Callback,
         }
     }
 
-    public void onPreviewFrame(byte[] data, Camera _) {
+    public void onPreviewFrame(byte[] data, Camera camera) {
         if (lock.tryLock()) {
             if (datosOCR.encontrar(data))
                 errores = 0;
@@ -191,7 +209,7 @@ class Preview extends SurfaceView implements SurfaceHolder.Callback,
         }
     }
 
-    public void onAutoFocus(boolean success, Camera _) {
+    public void onAutoFocus(boolean success, Camera camera) {
         enfocando = false;
     }
 
@@ -210,27 +228,29 @@ class Preview extends SurfaceView implements SurfaceHolder.Callback,
 }
 
 class Pantalla extends View {
-    private static final int INICIO_CUENTA_ATRÁS = 20;
+    private static final int SEGUNDOS_A_MOSTRAR_DÍGITO = 3;
     private static final int CONFIRMACIÓN_ACEPTABLE = 1;
     private static final int LÍMITE_ERRORES = 5;
 
     private ReentrantLock lock;
-    private Paint guía;
+    private Paint blanco;
+    private Paint negro;
     private Paint texto;
     private Paint estiloDígito;
     private DatosOCR datosOCR;
     private char dígito = '?';
-    private int cuentaAtrás = 0;
+    private long tiempo = 0;
     private int confirmación = 0;
     private int errores = 0;
-    private boolean depuración = false;
 
     Pantalla(Context context, DatosOCR datosOCR, ReentrantLock lock) {
         super(context);
         this.datosOCR = datosOCR;
         this.lock = lock;
-        guía = new Paint();
-        guía.setARGB(200, 255, 255, 255);
+        blanco = new Paint();
+        blanco.setARGB(200, 255, 255, 255);
+        negro = new Paint();
+        negro.setARGB(160, 0, 0, 0);
         texto = new Paint();
         texto.setColor(Color.WHITE);
         texto.setAntiAlias(true);
@@ -241,65 +261,60 @@ class Pantalla extends View {
     }
 
     protected void onDraw(Canvas canvas) {
-        float ratioY = (float) canvas.getHeight() / datosOCR.getAltoImagen();
+        int xInicio = datosOCR.getXInicioImagen();
+        int yInicio = datosOCR.getYInicioImagen();
+        int anchoUsado = datosOCR.getAnchoUsadoImagen();
+        int altoUsado = datosOCR.getAltoUsadoImagen();
         float ratioX = (float) canvas.getWidth() / datosOCR.getAnchoImagen();
+        float ratioY = (float) canvas.getHeight() / datosOCR.getAltoImagen();
+
         Segmento[] filas = datosOCR.getFilas();
         if (filas != null) {
             Segmento[] columnas = datosOCR.getColumnas();
             if (columnas == null) {
-                float y = filas[0].posición * ratioY;
-                canvas.drawRect(0, y, canvas.getWidth(), y + ratioY, guía);
+                float x1 = xInicio * ratioX;
+                float x2 = (xInicio + anchoUsado) * ratioX;
+                float y = (filas[0].posición + yInicio) * ratioY;
+                canvas.drawRect(x1, y, x2, y + ratioY, blanco);
                 for (Segmento fila : filas) {
-                    y = (fila.posición + fila.tamaño) * ratioY;
-                    canvas.drawRect(0, y, canvas.getWidth(), y + 1, guía);
+                    y = (fila.posición + fila.tamaño + yInicio) * ratioY;
+                    canvas.drawRect(x1, y, x2, y + 1, blanco);
                 }
             } else
                 for (int fila = 0; fila < filas.length; fila++) {
-                    float y1 = filas[fila].posición * ratioY;
-                    float y2 = (filas[fila].posición + filas[fila].tamaño)
+                    float y1 = (filas[fila].posición + yInicio) * ratioY;
+                    float y2 = (filas[fila].posición + filas[fila].tamaño
+                                + yInicio)
                                * ratioY - 1;
                     for (int columna = 0;
                          columna < columnas.length;
                          columna++)
                         if (datosOCR.esCarácterSignificativo(columna, fila)) {
-                            float x1 = columnas[columna].posición * ratioX;
+                            float x1 = (columnas[columna].posición + xInicio)
+                                    * ratioX;
                             float x2 = (columnas[columna].posición
-                                        + columnas[columna].tamaño)
+                                        + columnas[columna].tamaño + xInicio)
                                        * ratioX - 1;
-                            canvas.drawRect(x1, y1, x2, y2, guía);
+                            canvas.drawRect(x1, y1, x2, y2, blanco);
                         }
                 }
         }
-        texto.setTextSize(canvas.getHeight() / 22);
-        String mensaje = "Enfocar parte posterior del DNI";
-        float x = 5;
-        if (depuración) {
-            float y = texto.getTextSize() + 5;
-            texto.setTextAlign(Paint.Align.LEFT);
-            canvas.drawText("ancho: " + datosOCR.getAnchoImagen(),
-                            x, y, texto);
-            canvas.drawText("alto: " + datosOCR.getAltoImagen(),
-                            x, y * 2, texto);
-            canvas.drawText("encontrado dígito: "
-                            + datosOCR.getResultadosEncontradoDígito(),
-                            x, y * 3, texto);
-            canvas.drawText("encontrado columnas: "
-                            + datosOCR.getResultadosEncontradoColumnas(),
-                            x, y * 4, texto);
-            canvas.drawText("encontrado filas: "
-                            + datosOCR.getResultadosEncontradoFilas(),
-                            x, y * 5, texto);
-            canvas.drawText("no encontrado: "
-                            + datosOCR.getResultadosNoEncontrado(),
-                            x, y * 6, texto);
-        }
-        x = canvas.getWidth() / 2;
+
+        canvas.drawRect(0, 0, canvas.getWidth(), yInicio * ratioY, negro);
+        canvas.drawRect(0, (yInicio + altoUsado) * ratioY, canvas.getWidth(),
+                        canvas.getHeight(), negro);
+        canvas.drawRect(0, yInicio * ratioY, xInicio * ratioX,
+                (yInicio + altoUsado) * ratioY, negro);
+        canvas.drawRect((xInicio + anchoUsado) * ratioX, yInicio * ratioY,
+                canvas.getWidth(), (yInicio + altoUsado) * ratioY, negro);
+
+        String mensaje = "Enfocar las 3 líneas de caracteres OCR del DNI";
+        float x = canvas.getWidth() / 2;
         float y = canvas.getHeight() - texto.getTextSize();
+        texto.setTextSize(canvas.getHeight() / 22);
         texto.setTextAlign(Paint.Align.CENTER);
         canvas.drawText(mensaje, x, y, texto);
-        y = canvas.getHeight() / 2;
-        canvas.drawRect(0, y, canvas.getWidth(), y + 1, guía);
-        canvas.drawRect(x, y / 2, x + 1, y * 1.5f, guía);
+
         char nuevoDígito = datosOCR.getDígito();
         if (nuevoDígito == '?') {
             if (dígito != '?' && confirmación < CONFIRMACIÓN_ACEPTABLE
@@ -311,22 +326,22 @@ class Pantalla extends View {
             confirmación = 0;
             errores = 0;
             dígito = nuevoDígito;
-            cuentaAtrás = INICIO_CUENTA_ATRÁS;
+            tiempo = 0;
         }
-        if (dígito != '?' && confirmación >= CONFIRMACIÓN_ACEPTABLE
-            && cuentaAtrás > 0) {
-            estiloDígito.setTextSize(canvas.getHeight() / 2);
+
+        if (dígito != '?' && confirmación >= CONFIRMACIÓN_ACEPTABLE) {
+            if (tiempo == 0)
+                tiempo = System.currentTimeMillis();
+            estiloDígito.setTextSize(canvas.getHeight());
             y = canvas.getHeight() / 2 + estiloDígito.getTextSize() / 3;
             canvas.drawText(Character.toString(dígito), x, y, estiloDígito);
-            if (--cuentaAtrás == 0)
+            if ((System.currentTimeMillis() - tiempo) / 1000
+                >= SEGUNDOS_A_MOSTRAR_DÍGITO)
                 dígito = '?';
         }
+
         if (lock.isLocked())
             lock.unlock();
-    }
-
-    public void cambiaDepuración() {
-        depuración = !depuración;
     }
 }
 
@@ -345,7 +360,9 @@ class Colisión extends Segmento {
 }
 
 class DatosOCR {
-    private static final int FACTOR_UMBRAL_ÓPTIMO_CARÁCTER = 4;
+    private static final double FACTOR_DESVIACIÓN_FILAS = 0.12;
+    private static final double FACTOR_DESVIACIÓN_COLUMNAS = 1.0;
+    private static final double FACTOR_UMBRAL_ÓPTIMO_CARÁCTER = 0.7;
 
     private static final int FILA_NÚMEROS = 0;
     private static final int COLUMNA_NÚMEROS = 5;
@@ -400,12 +417,13 @@ class DatosOCR {
 
     private int anchoImagen;
     private int altoImagen;
+    private int xInicioImagen;
+    private int yInicioImagen;
+    private int anchoUsadoImagen;
+    private int altoUsadoImagen;
+    private int altoFilaMínimo;
+    private int anchoColumnaMínimo;
     private byte[] píxeles;
-
-    private int desviaciónMáximaTamañosFilas;
-    private int desviaciónMáximaTamañosSepFilas;
-    private int desviaciónMáximaTamañosColumnas;
-    private int desviaciónMáximaTamañosSepColumnas;
 
     private Colisión[] colisiones;
     private int cantidadColisiones;
@@ -441,11 +459,6 @@ class DatosOCR {
     private char[] datosDNI;
     private char[] datosDNIE;
     private char dígito;
-
-    private long resultadosEncontradoDígito = 0;
-    private long resultadosEncontradoColumnas = 0;
-    private long resultadosEncontradoFilas = 0;
-    private long resultadosNoEncontrado = 0;
 
     DatosOCR(Context context) {
         candidatoColumnas = new Segmento[NÚMERO_COLUMNAS];
@@ -528,20 +541,20 @@ class DatosOCR {
         }
     }
 
-    public void setTamañoImagen(int ancho, int alto) {
-        valoresColumnas = new int[ancho];
-        valoresFilas = new int[alto];
-        colisiones = new Colisión[Math.max(ancho, alto)];
-        for (int i = 0; i < colisiones.length; i++)
-            colisiones[i] = new Colisión();
+    public void setTamañoImagen(int ancho, int alto,
+                                int anchoUsado, int altoUsado) {
         anchoImagen = ancho;
         altoImagen = alto;
-        float ratioY = alto / 240;
-        desviaciónMáximaTamañosFilas = (int) Math.ceil(2 * ratioY);
-        desviaciónMáximaTamañosSepFilas = (int) Math.ceil(ratioY);
-        float ratioX = ancho / 320;
-        desviaciónMáximaTamañosColumnas = (int) Math.ceil(4 * ratioX);
-        desviaciónMáximaTamañosSepColumnas = (int) Math.ceil(4 * ratioX);
+        xInicioImagen = (ancho - anchoUsado) / 2;
+        anchoUsadoImagen = anchoUsado;
+        yInicioImagen = (alto - altoUsado) / 2;
+        altoUsadoImagen = altoUsado;
+        altoFilaMínimo = altoUsado / 8;
+        valoresColumnas = new int[anchoUsado];
+        valoresFilas = new int[altoUsado];
+        colisiones = new Colisión[Math.max(anchoUsado, altoUsado)];
+        for (int i = 0; i < colisiones.length; i++)
+            colisiones[i] = new Colisión();
     }
 
     private int max(int[] valores) {
@@ -551,35 +564,36 @@ class DatosOCR {
         return m;
     }
 
-    private boolean desviaciónMáxima(int[] valores, int máximo) {
-        int promedio = 0;
+    private boolean desviaciónMáxima(int[] valores, double factor) {
+        double promedio = 0;
         for (int valor : valores)
             promedio += valor;
         promedio /= valores.length;
-        int desviaciónEstándar = 0;
+        double desviaciónEstándar = 0;
         for (int valor : valores)
             desviaciónEstándar += Math.pow(valor - promedio, 2);
-        desviaciónEstándar = (int) Math.sqrt(desviaciónEstándar);
-        return desviaciónEstándar >= 0 && desviaciónEstándar <= máximo;
+        desviaciónEstándar = Math.sqrt(desviaciónEstándar);
+        return desviaciónEstándar <= promedio * factor;
     }
 
     private int luminosidad(int x, int y) {
-        return píxeles[x + anchoImagen * y] & 0xff;
+        return píxeles[x + xInicioImagen + anchoImagen * (y + yInicioImagen)]
+               & 0xff;
     }
 
     private void calcularValoresFilas() {
-        for (int y = 0; y < altoImagen; y++) {
+        for (int y = 0; y < altoUsadoImagen; y++) {
             int total = 0;
-            for (int x = 0; x < anchoImagen; x++)
+            for (int x = 0; x < anchoUsadoImagen; x++)
                 total += luminosidad(x, y);
-            valoresFilas[y] = total / anchoImagen;
+            valoresFilas[y] = total / anchoUsadoImagen;
         }
     }
 
     private void calcularValoresColumnas() {
         int inicio = filas[0].posición;
         int fin = filas[1].posición + filas[1].tamaño;
-        for (int x = 0; x < anchoImagen; x++) {
+        for (int x = 0; x < anchoUsadoImagen; x++) {
             int min = Integer.MAX_VALUE;
             int max = Integer.MIN_VALUE;
             for (int y = inicio; y < fin; y++) {
@@ -642,6 +656,10 @@ class DatosOCR {
             e = colisiones[índiceColisiones + 4];
             f = colisiones[índiceColisiones + 5];
             g = colisiones[índiceColisiones + 6];
+            if (b.tamaño < altoFilaMínimo
+                || d.tamaño < altoFilaMínimo
+                || f.tamaño < altoFilaMínimo)
+                return false;
             tamañosFilas[0] = b.tamaño;
             tamañosFilas[1] = d.tamaño;
             tamañosFilas[2] = f.tamaño;
@@ -654,10 +672,9 @@ class DatosOCR {
                 && tamañoMaxFilas > max(tamañosSepFilas)
                 && tamañoMaxFilas < a.tamaño
                 && tamañoMaxFilas < g.tamaño
-                && desviaciónMáxima(tamañosFilas,
-                                    desviaciónMáximaTamañosFilas)
+                && desviaciónMáxima(tamañosFilas, FACTOR_DESVIACIÓN_FILAS)
                 && desviaciónMáxima(tamañosSepFilas,
-                                    desviaciónMáximaTamañosSepFilas)) {
+                                    FACTOR_DESVIACIÓN_FILAS)) {
                 for (int fila = 0;
                      fila < candidatoFilas.length;
                      fila++)
@@ -708,14 +725,15 @@ class DatosOCR {
                  columna++) {
                 tamañosColumnas[columna] =
                     colisiones[índiceColisiones + 1 + columna * 2].tamaño;
+                if (tamañosColumnas[columna] < anchoColumnaMínimo)
+                    return false;
                 if (columna < candidatoColumnas.length - 1)
                     tamañosSepColumnas[columna] =
                         colisiones[índiceColisiones + 2 + columna * 2].tamaño;
             }
-            if (desviaciónMáxima(tamañosColumnas,
-                                 desviaciónMáximaTamañosColumnas)
+            if (desviaciónMáxima(tamañosColumnas, FACTOR_DESVIACIÓN_COLUMNAS)
                 && desviaciónMáxima(tamañosSepColumnas,
-                                    desviaciónMáximaTamañosSepColumnas)) {
+                                    FACTOR_DESVIACIÓN_COLUMNAS)) {
                 for (int columna = 0;
                      columna < candidatoColumnas.length;
                      columna++)
@@ -735,6 +753,8 @@ class DatosOCR {
     }
 
     private Segmento[] encuentraColumnas() {
+        anchoColumnaMínimo = (filas[1].posición + filas[1].tamaño
+                              - filas[0].posición) / 8;
         calcularValoresColumnas();
         boolean encontrado = false;
         int min = Integer.MAX_VALUE;
@@ -816,26 +836,12 @@ class DatosOCR {
     }
 
     private int calcularUmbralÓptimoCarácter(int columna, int fila) {
-        int min = Integer.MAX_VALUE;
-        int max = Integer.MIN_VALUE;
+        int suma = 0;
         for (int y = 0; y < filas[fila].tamaño; y++)
-            for (int x = 0; x < columnas[columna].tamaño; x++) {
-                int v = luminosidadCarácter(columna, fila, x, y);
-                min = Math.min(v, min);
-                max = Math.max(v, max);
-            }
-        int umbral = max;
-        int óptimo = filas[fila].tamaño * columnas[columna].tamaño
-                     / FACTOR_UMBRAL_ÓPTIMO_CARÁCTER;
-        int encendidos;
-        do {
-            encendidos = 0;
-            for (int y = 0; y < filas[fila].tamaño; y++)
-                for (int x = 0; x < columnas[columna].tamaño; x++)
-                    if (bitCarácter(columna, fila, x, y, umbral))
-                        encendidos++;
-        } while (--umbral > min && encendidos > óptimo);
-        return umbral;
+            for (int x = 0; x < columnas[columna].tamaño; x++)
+                suma += luminosidadCarácter(columna, fila, x, y);
+        return (int) (suma / (filas[fila].tamaño * columnas[columna].tamaño)
+                * FACTOR_UMBRAL_ÓPTIMO_CARÁCTER);
     }
 
     private int puntuaciónPlantilla(int columna, int fila,
@@ -881,8 +887,8 @@ class DatosOCR {
         int umbral = calcularUmbralÓptimoCarácter(columna, fila);
         int xInicio = xInicioCarácter(columna, fila, umbral);
         int yInicio = yInicioCarácter(columna, fila, umbral);
-        int ancho = xFinCarácter(columna, fila, umbral) - xInicio;
-        int alto = yFinCarácter(columna, fila, umbral) - yInicio;
+        int ancho = xFinCarácter(columna, fila, umbral) - xInicio + 1;
+        int alto = yFinCarácter(columna, fila, umbral) - yInicio + 1;
         Character valor = '?';
         int mejorPuntuación = 0;
         for (int i = 0; i < caracteres.length(); i++) {
@@ -1027,14 +1033,10 @@ class DatosOCR {
                     formato = FORMATO_DNIE;
                 if (datosLeídosCorrectamente()) {
                     dígito = calculaDígito();
-                    resultadosEncontradoDígito++;
                     return true;
                 }
-                resultadosEncontradoColumnas++;
             }
-            resultadosEncontradoFilas++;
         }
-        resultadosNoEncontrado++;
         return false;
     }
 
@@ -1044,6 +1046,22 @@ class DatosOCR {
 
     public int getAltoImagen() {
         return altoImagen;
+    }
+
+    public int getXInicioImagen() {
+        return xInicioImagen;
+    }
+
+    public int getYInicioImagen() {
+        return yInicioImagen;
+    }
+
+    public int getAnchoUsadoImagen() {
+        return anchoUsadoImagen;
+    }
+
+    public int getAltoUsadoImagen() {
+        return altoUsadoImagen;
     }
 
     public Segmento[] getColumnas() {
@@ -1056,21 +1074,5 @@ class DatosOCR {
 
     public char getDígito() {
         return dígito;
-    }
-
-    public long getResultadosEncontradoDígito() {
-        return resultadosEncontradoDígito;
-    }
-
-    public long getResultadosEncontradoColumnas() {
-        return resultadosEncontradoColumnas;
-    }
-
-    public long getResultadosEncontradoFilas() {
-        return resultadosEncontradoFilas;
-    }
-
-    public long getResultadosNoEncontrado() {
-        return resultadosNoEncontrado;
     }
 }
